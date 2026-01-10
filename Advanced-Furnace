@@ -1,0 +1,127 @@
+push -1301215609 #BASIC INGOT (IRON)
+push 900
+push 9999
+push 100
+push 40000
+push -654790771 #STEEL
+push 900
+push 9999
+push 1000
+push 50000
+push -297990285 #INVAR
+push 1200
+push 1500
+push 18000
+push 20000
+push -82508479 #SOLDER
+push 350
+push 550
+push 1000
+push 50000
+push 502280180 #ELECTRUM
+push 600
+push 9999
+push 1
+push 2400
+push 1058547521 #CONSTANTAN
+push 1000
+push 9999
+push 20000
+push 50000
+push 156348098 #WASPALLOY
+push 400
+push 800
+push 50000
+push 55000
+push -787796599 #INCONEL
+push 600
+push 9999
+push 23500
+push 24000
+push 412924554 #ASTROLOY
+push 1000
+push 9999
+push 30000
+push 40000
+push 1579842814 #HASTELLOY
+push 950
+push 1000
+push 25000
+push 30000
+push -1897868623 #STELITE
+push 1800
+push 9999
+push 10000
+push 20000
+alias dVPumpCool d0 #devices
+alias dVPumpFuel d1
+alias dStartButton d2
+alias dEStopButton d3
+alias rReqHash r4
+alias rMinT r5
+alias rMaxT r6
+alias rMinP r7
+alias rMaxP r8
+alias rFurnaceOpen r9
+alias rFurnaceRHash r10
+alias rFurnaceT r11
+alias rFurnaceP r12
+start:
+s dVPumpCool On 0 #set up the input pumps
+s dVPumpCool Setting 20 
+s dVPumpFuel On 0  
+s dVPumpFuel Setting 5
+jal check
+sb 545937711 Open 0
+lb rReqHash 554524804 Setting 1 #req item from dial
+mul sp rReqHash 5 #calc lut offset...
+add sp sp 5
+pop rMaxP #read ingot info from lut...
+pop rMinP
+pop rMaxT
+pop rMinT
+pop rReqHash
+s db Setting rReqHash #hash to display
+l r0 dStartButton Setting #check start button
+bgtz r0 smeltLoop #and start a smelt
+yield
+j start #or loop back to start if not
+smeltLoop:
+jal check
+sb 545937711 SettingInput 100
+sb 545937711 Activate 1
+lb rFurnaceOpen 545937711 Open 1
+lb rFurnaceRHash 545937711 RecipeHash 1
+lb rFurnaceT 545937711 Temperature 1
+lb rFurnaceP 545937711 Pressure 1
+bgt rFurnaceP 58000 estop
+slt r0 rFurnaceT rMinT#r0=1 if temp&lt;min
+sgt r1 rFurnaceT rMaxT#r1=1 if temp&gt;max
+slt r2 rFurnaceP rMinP#r2=1 if pres&lt;min
+select r2 rMinP r2 0 #r2=1 if minpressure==0
+sgt r3 rFurnaceP rMaxP#r3=1 if pressure&gt;max
+or r0 r0 r2 #fuel
+mul r3 r3 30 #furnace output pump
+s dVPumpFuel On r0 #set input pumps on/off
+s dVPumpCool On r1
+sb 545937711 SettingOutput r3 #furnace output pump
+breq rReqHash -1301215609 2#basic ingot,user open
+beq rReqHash rFurnaceRHash smeltEnd#ingot done?
+bgtz rFurnaceOpen smeltEnd#end if user opens furnace
+j smeltLoop #not done, go again
+smeltEnd:
+sb 545937711 Open 1 #^SmeltEnd
+yield #give it time to come out
+lb r0 54593771 Reagents 1#check for stuff in furnace
+brgtz r0 -3 #repeat until empty
+j start
+check: #estop / dump gas button check + mixer subsys
+lb r0 435685051 Pressure 1 #check fuel mixer system
+sgt r0 2000 r0 #pipe &gt; 2kPa? r0=0 else 1
+sb 2104106366 On r0 #set mixer on or off
+l r0 dEStopButton Setting #check estop btn
+beqz r0 ra #if not pressed, jump back
+estop:
+sb 545937711 SettingInput 0 #or shut off input...
+sb 545937711 SettingOutput 100#and dump output
+j start
